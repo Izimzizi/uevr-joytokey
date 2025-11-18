@@ -460,7 +460,7 @@ public:
 	
     void SetKeyForAxis(BYTE& Axis, int CompareValue, int i)
     {
-		if(_SetKeyForAxis(Axis, CompareValue, i) == true) Axis = 0;
+		_SetKeyForAxis(Axis, CompareValue, i);
 	}
 
 	//***************************************************************************************************
@@ -809,4 +809,5 @@ TimerCallbackThreadProc(
 	Jtc->start_input_polling();
     return 0;
 }
+
 
