@@ -294,7 +294,7 @@ public:
     //*******************************************************************************************
     // This is the controller input routine. Everything happens here.
     //*******************************************************************************************
-   void JoyToKey::on_xinput_get_state(uint32_t* retval, uint32_t user_index, XINPUT_STATE* state)
+   void on_xinput_get_state(uint32_t* retval, uint32_t user_index, XINPUT_STATE* state)
 {
     if (!state) return;
 
@@ -694,6 +694,7 @@ TimerCallbackThreadProc(
 	Jtc->start_input_polling();
     return 0;
 }
+
 
 
 
