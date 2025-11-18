@@ -294,164 +294,49 @@ public:
     //*******************************************************************************************
     // This is the controller input routine. Everything happens here.
     //*******************************************************************************************
-    void on_xinput_get_state(uint32_t* retval, uint32_t user_index, XINPUT_STATE* state) 
-    {
-        int i = 0;
-        int Start = 0;
-		int MotionLbFactor = 0;
-        int Limit = GAMEPAD_NUMBER_OF_BUTTONS;
-		
-		// We are using this flag to determine if the source of calling this function is
-		// the UEVR / game's xinput pump or if it's from our thread.
-		if(m_XinputPumpRunning == false && user_index != CONTROLLER_SOURCE_THREAD)
-		{
-			m_XinputPumpRunning = true;
-			API::get()->log_info("JoytoKey.dll: Detected natural xinput pump running. Disabling VR handle input.");  
-		}			
-		
-        if(state != NULL)
-        {
-			UEVR_TrackedDeviceIndex HmdIndex = m_VR->get_hmd_index();
-			UEVR_TrackedDeviceIndex LeftIndex = m_VR->get_left_controller_index();
-			UEVR_TrackedDeviceIndex RightIndex = m_VR->get_right_controller_index();
-			
-			bool LeftAndHmd = is_controller_near_hmd(LeftIndex, TOUCH_PROXIMITY, HmdIndex);
-			bool RightAndHmd = is_controller_near_hmd(RightIndex, TOUCH_PROXIMITY, HmdIndex);
-			bool LeftAndRight = is_controller_near_hmd(LeftIndex, TOUCH_PROXIMITY, RightIndex);
-			
-			if(m_ExtraDebug == true)
-			{
-				
-				API::get()->log_info("JoytoKey.dll: on_xinput_get_state: wButtons=0x%04x, Right Stick(%d,%d), Left Stick(%d,%d)\n", 
-									 state->Gamepad.wButtons, 
-									 state->Gamepad.sThumbRX,
-									 state->Gamepad.sThumbRY,
-									 state->Gamepad.sThumbLX,
-									 state->Gamepad.sThumbLY
-									 );  
-			}
+   void JoyToKey::on_xinput_get_state(uint32_t* retval, uint32_t user_index, XINPUT_STATE* state)
+{
+    if (!state) return;
 
-            // if using shift key
-            if(m_Keys[GAMEPAD_LB].Key == 0)
-            {
-                // LB is not down, so we need to clear every LB key
-                if(!(state->Gamepad.wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER))
-                {
-                    // OK If LB is not down, go through every shift key and if one is down, release it
-                    for(i = GAMEPAD_NUMBER_OF_BUTTONS; i < TOTAL_GAMEPAD_BUTTONS; i++)
-                    {
-                        if(m_Keys[i].KeyDown == true)
-                        {
-                            send_key_or_mouse(i, KEYUP);
-                            m_Keys[i].KeyDown = false;
-                        }
-                    }
-					
-					// clear motion shifted LB buttons
-					for(i = LEFT_CONTROL_LB_TO_HMD; i < TOTAL_BUTTONS; i++)
-					{
-                        if(m_Keys[i].KeyDown == true)
-                        {
-                            send_key_or_mouse(i, KEYUP);
-                            m_Keys[i].KeyDown = false;
-                        }
-					}
-                }
-                
-                // LB is down, so we need to clear every regular key.
-                else
-                {
-                    // OK If LB not down, go through every shift key and if one is down, release it
-                    for(i = 1; i < GAMEPAD_NUMBER_OF_BUTTONS; i++)
-                    {
-                        if(m_Keys[i].KeyDown == true)
-                        {
-                            send_key_or_mouse(i, KEYUP);
-                            m_Keys[i].KeyDown = false;
-                        }
-                    }
-					
-					// Clear non-shifted motion buttons
-					for(i = LEFT_CONTROL_TO_HMD; i < (NUM_MOTIONS/2); i++)
-					{
-                        if(m_Keys[i].KeyDown == true)
-                        {
-                            send_key_or_mouse(i, KEYUP);
-                            m_Keys[i].KeyDown = false;
-                        }
-					}
+    // Move mouse from right stick
+    MoveMousePointer(state->Gamepad.sThumbRX, true);
+    MoveMousePointer(state->Gamepad.sThumbRY, false);
 
-                    Start = GAMEPAD_NUMBER_OF_BUTTONS;
-					MotionLbFactor = NUM_MOTIONS/2;
-                    Limit = TOTAL_GAMEPAD_BUTTONS;
-                }
-            }
-			
-            // Seems there's a state before the game gets going these all return 1.
-            if(LeftAndHmd == true && RightAndHmd == true && LeftAndRight == true)
-            {
-                LeftAndHmd = false;
-                RightAndHmd = false;
-                LeftAndRight = false;
-            }
-            
-            if(LeftAndHmd || RightAndHmd || LeftAndRight)
-                API::get()->log_info("joytokey: left+hmd=%d, right+hmd=%d, left+right=%d", LeftAndHmd, RightAndHmd, LeftAndRight);
-			// Go through the motion positions
-			SetKeyForControllerPosition(LEFT_CONTROL_TO_HMD + MotionLbFactor, LeftAndHmd);
-			SetKeyForControllerPosition(RIGHT_CONTROL_TO_HMD + MotionLbFactor, RightAndHmd);
-			SetKeyForControllerPosition(LEFT_RIGHT_CONTROL_TOUCH + MotionLbFactor, LeftAndRight);
-            
-            // go through each xinput button. If it's down check if we need to set it. If its not, check if we need to clear it
-            SetKeyForGamepad(state, Start + GAMEPAD_DPAD_UP, XINPUT_GAMEPAD_DPAD_UP);
-            SetKeyForGamepad(state, Start + GAMEPAD_DPAD_DOWN, XINPUT_GAMEPAD_DPAD_DOWN);
-            SetKeyForGamepad(state, Start + GAMEPAD_DPAD_LEFT, XINPUT_GAMEPAD_DPAD_LEFT);
-            SetKeyForGamepad(state, Start + GAMEPAD_DPAD_RIGHT, XINPUT_GAMEPAD_DPAD_RIGHT);
-           
-            SetKeyForGamepad(state, Start + GAMEPAD_START, XINPUT_GAMEPAD_START);
-            SetKeyForGamepad(state, Start + GAMEPAD_BACK, XINPUT_GAMEPAD_BACK);
-            SetKeyForGamepad(state, Start + GAMEPAD_L3, XINPUT_GAMEPAD_LEFT_THUMB);
-            SetKeyForGamepad(state, Start + GAMEPAD_R3, XINPUT_GAMEPAD_RIGHT_THUMB);
-            
-            SetKeyForGamepad(state, Start + GAMEPAD_LB, XINPUT_GAMEPAD_LEFT_SHOULDER);
-            SetKeyForGamepad(state, Start + GAMEPAD_RB, XINPUT_GAMEPAD_RIGHT_SHOULDER);
-            
-            SetKeyForGamepad(state, Start + GAMEPAD_A, XINPUT_GAMEPAD_A);
-            SetKeyForGamepad(state, Start + GAMEPAD_B, XINPUT_GAMEPAD_B);
-            SetKeyForGamepad(state, Start + GAMEPAD_X, XINPUT_GAMEPAD_X);
-            SetKeyForGamepad(state, Start + GAMEPAD_Y, XINPUT_GAMEPAD_Y);
-            
-            SetKeyForAxis(state->Gamepad.bRightTrigger, 200, Start + GAMEPAD_RT);
-            SetKeyForAxis(state->Gamepad.bLeftTrigger, 200, Start + GAMEPAD_LT);
+    // Simple trigger -> mouse, no m_Keys, no shift logic
+    const int threshold = 30;
 
-            SetKeyForAxis(state->Gamepad.sThumbLX, 20000, Start + GAMEPAD_LSTICK_RIGHT);
-            SetKeyForAxis(state->Gamepad.sThumbLX, -20000, Start + GAMEPAD_LSTICK_LEFT);
-            SetKeyForAxis(state->Gamepad.sThumbLY, 20000, Start + GAMEPAD_LSTICK_UP);
-            SetKeyForAxis(state->Gamepad.sThumbLY, -20000, Start + GAMEPAD_LSTICK_DOWN);
-            
-            // If right axis isn't overridden, use it as a mouse pointer.
-            if(m_Keys[Start + GAMEPAD_RSTICK_RIGHT].Key == 0 && m_Keys[Start + GAMEPAD_RSTICK_LEFT].Key == 0)
-            {
-                if(m_Keys[Start + GAMEPAD_RSTICK_RIGHT].Key != 0xFF && m_Keys[Start + GAMEPAD_RSTICK_LEFT].Key != 0xFF)
-                    MoveMousePointer(state->Gamepad.sThumbRX, true);
-            }
-            else
-            {
-                SetKeyForAxis(state->Gamepad.sThumbRX, 20000, Start + GAMEPAD_RSTICK_RIGHT);
-                SetKeyForAxis(state->Gamepad.sThumbRX, -20000, Start + GAMEPAD_RSTICK_LEFT);
-            }
-            if(m_Keys[Start + GAMEPAD_RSTICK_UP].Key == 0 && m_Keys[Start + GAMEPAD_RSTICK_DOWN].Key == 0)
-            {
-                if(m_Keys[Start + GAMEPAD_RSTICK_UP].Key != 0xFF && m_Keys[Start + GAMEPAD_RSTICK_DOWN].Key != 0xFF)
-                    MoveMousePointer(state->Gamepad.sThumbRY, false);
-            }
-            else
-            {
-                SetKeyForAxis(state->Gamepad.sThumbRY, 20000, Start + GAMEPAD_RSTICK_UP);
-                SetKeyForAxis(state->Gamepad.sThumbRY, -20000, Start + GAMEPAD_RSTICK_DOWN);
-            }
-        }
+    bool rtPhysDown = state->Gamepad.bRightTrigger > threshold;
+    bool ltPhysDown = state->Gamepad.bLeftTrigger  > threshold;
+
+    if (rtPhysDown && !m_rtDown) {
+        INPUT in{};
+        in.type = INPUT_MOUSE;
+        in.mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+        SendInput(1, &in, sizeof(in));
+        m_rtDown = true;
+    } else if (!rtPhysDown && m_rtDown) {
+        INPUT in{};
+        in.type = INPUT_MOUSE;
+        in.mi.dwFlags = MOUSEEVENTF_LEFTUP;
+        SendInput(1, &in, sizeof(in));
+        m_rtDown = false;
     }
+
+    if (ltPhysDown && !m_ltDown) {
+        INPUT in{};
+        in.type = INPUT_MOUSE;
+        in.mi.dwFlags = MOUSEEVENTF_RIGHTDOWN;
+        SendInput(1, &in, sizeof(in));
+        m_ltDown = true;
+    } else if (!ltPhysDown && m_ltDown) {
+        INPUT in{};
+        in.type = INPUT_MOUSE;
+        in.mi.dwFlags = MOUSEEVENTF_RIGHTUP;
+        SendInput(1, &in, sizeof(in));
+        m_ltDown = false;
+    }
+}
+
 
     void SetKeyForAxis(SHORT& Axis, int CompareValue, int i)
     {
@@ -809,5 +694,6 @@ TimerCallbackThreadProc(
 	Jtc->start_input_polling();
     return 0;
 }
+
 
 
